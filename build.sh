@@ -3,7 +3,9 @@
 # Builds a static, transcription-only ffmpeg with the whisper filter for macOS.
 #
 #   ./build.sh arm64   -> dist/ffmpeg-whisper-arm64   (Metal + Accelerate)
+#                         dist/ffprobe-arm64
 #   ./build.sh x64     -> dist/ffmpeg-whisper-x64     (CPU/AVX2 + Accelerate)
+#                         dist/ffprobe-x64
 #
 # Both run on an Apple Silicon host; x64 is cross-compiled.
 #
@@ -13,6 +15,11 @@
 # Everything else is disabled (--disable-everything + an allow-list), so it
 # stays small and LGPL-only: no --enable-gpl, no external codec libraries.
 # whisper.cpp is the only third-party library, and it is MIT.
+#
+# ffprobe comes from the same configure run. Downlodr uses it for duration and
+# audio-stream detection, and yt-dlp uses it to inspect downloads, so every
+# demuxer and parser is enabled: probing only reads container headers and
+# needs no extra decoders.
 #
 # Requires: Xcode command line tools, cmake, pkg-config, nasm (x64 only).
 
@@ -170,12 +177,13 @@ PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig" PKG_CONFIG_LIBDIR="$PREFIX/lib/pkgconfig
   --disable-network \
   --disable-programs \
   --enable-ffmpeg \
+  --enable-ffprobe \
   --disable-everything \
   --enable-whisper \
   --enable-filter=whisper,aresample,aformat,anull,atrim,format,null,trim \
   --enable-protocol=file,pipe \
-  --enable-demuxer=mov,matroska,mp3,ogg,wav,w64,aac,ac3,eac3,flac,aiff,mpegts \
-  --enable-parser=aac,aac_latm,ac3,flac,mpegaudio,opus,vorbis \
+  --enable-demuxers \
+  --enable-parsers \
   --enable-decoder=aac,aac_latm,ac3,eac3,alac,flac,mp3,mp3float,opus,vorbis,pcm_s16le,pcm_s16be,pcm_s24le,pcm_s24be,pcm_s32le,pcm_f32le,pcm_f32be \
   --enable-encoder=pcm_s16le \
   --enable-muxer=wav,null \
@@ -188,21 +196,28 @@ cp -f "$PREFIX/bin/ffmpeg" "$OUT"
 strip -x "$OUT" || true
 chmod +x "$OUT"
 
-# ---------------------------------------------------------------------------
-# 3. Sanity checks that don't need to run the binary
-# ---------------------------------------------------------------------------
-echo "==> $(file "$OUT")"
-lipo -info "$OUT" | grep -q "$CMAKE_ARCH" \
-  || { echo "!! wrong architecture" >&2; exit 1; }
+PROBE_OUT="$DIST/ffprobe-$ARCH"
+cp -f "$PREFIX/bin/ffprobe" "$PROBE_OUT"
+strip -x "$PROBE_OUT" || true
+chmod +x "$PROBE_OUT"
 
-# Must be self-contained: only system libraries/frameworks may be linked.
-echo "==> Linked libraries:"
-otool -L "$OUT"
-if otool -L "$OUT" | tail -n +2 | awk '{print $1}' \
-     | grep -vE '^(/usr/lib/|/System/Library/)'; then
-  echo "!! non-system dynamic dependency found (listed above)" >&2
-  exit 1
-fi
+# ---------------------------------------------------------------------------
+# 3. Sanity checks that don't need to run the binaries
+# ---------------------------------------------------------------------------
+for bin in "$OUT" "$PROBE_OUT"; do
+  echo "==> $(file "$bin")"
+  lipo -info "$bin" | grep -q "$CMAKE_ARCH" \
+    || { echo "!! wrong architecture: $bin" >&2; exit 1; }
 
-ls -lh "$OUT"
-echo "==> Built $OUT"
+  # Must be self-contained: only system libraries/frameworks may be linked.
+  echo "==> Linked libraries:"
+  otool -L "$bin"
+  if otool -L "$bin" | tail -n +2 | awk '{print $1}' \
+       | grep -vE '^(/usr/lib/|/System/Library/)'; then
+    echo "!! non-system dynamic dependency found in $bin (listed above)" >&2
+    exit 1
+  fi
+
+  ls -lh "$bin"
+  echo "==> Built $bin"
+done

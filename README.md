@@ -8,10 +8,17 @@ These are **transcription-only**: they decode common audio/video containers,
 resample to 16 kHz mono WAV, and run the whisper filter. Downloading and
 merging in Downlodr keep using the regular ffmpeg builds.
 
+Each release also ships a static `ffprobe` from the same build. Unlike the
+ffmpeg binary it is general-purpose: it can read every container ffmpeg
+supports, so Downlodr uses it for duration and audio-track detection, and
+yt-dlp uses it to inspect downloads, without needing Rosetta on Apple Silicon.
+
 | Asset | Target | Acceleration |
 |---|---|---|
 | `ffmpeg-whisper-arm64` | Apple Silicon, macOS 11+ | Metal + Accelerate |
 | `ffmpeg-whisper-x64` | Intel (Haswell+), macOS 11+ | AVX2 + Accelerate |
+| `ffprobe-arm64` | Apple Silicon, macOS 11+ | n/a |
+| `ffprobe-x64` | Intel (Haswell+), macOS 11+ | n/a |
 
 ## Releasing a new version
 
@@ -19,7 +26,7 @@ merging in Downlodr keep using the regular ffmpeg builds.
    `curl -fsSL <url> | shasum -a 256`).
 2. Open a PR. CI builds both arches and transcribes a sample with each.
 3. Once it's merged, tag `v<ffmpeg>-w<whisper>-r<n>` (e.g. `v9.0.1-w1.9.4-r1`)
-   and push the tag. CI publishes a release with both binaries, `SHA256SUMS`,
+   and push the tag. CI publishes a release with the ffmpeg and ffprobe binaries for both arches, `SHA256SUMS`,
    build info and the source tarballs.
 4. In Downlodr, update the URL + sha256 in `package.json`.
 

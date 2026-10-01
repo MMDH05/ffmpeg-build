@@ -76,6 +76,7 @@ jobs:
           name: ffmpeg-whisper-${{ matrix.arch }}
           path: |
             dist/ffmpeg-whisper-${{ matrix.arch }}
+            dist/ffprobe-${{ matrix.arch }}
             dist/buildinfo-${{ matrix.arch }}.txt
           if-no-files-found: error
 
@@ -114,8 +115,8 @@ jobs:
       - name: Checksums
         working-directory: release
         run: |
-          chmod +x ffmpeg-whisper-*
-          sha256sum ffmpeg-whisper-arm64 ffmpeg-whisper-x64 *.tar.* > SHA256SUMS
+          chmod +x ffmpeg-whisper-* ffprobe-*
+          sha256sum ffmpeg-whisper-arm64 ffmpeg-whisper-x64 ffprobe-arm64 ffprobe-x64 *.tar.* > SHA256SUMS
           cat SHA256SUMS
 
       # The exact ffmpeg and whisper.cpp source tarballs are attached to every
@@ -131,6 +132,7 @@ jobs:
             echo
             echo "- \`ffmpeg-whisper-arm64\`: Apple Silicon, Metal + Accelerate"
             echo "- \`ffmpeg-whisper-x64\`: Intel, AVX2 + Accelerate (Haswell or newer)"
+            echo "- \`ffprobe-arm64\` / \`ffprobe-x64\`: ffprobe ${FFMPEG_VERSION} from the same build, able to read every container ffmpeg supports"
             echo
             echo "Licence: ffmpeg is LGPL-2.1-or-later (built without --enable-gpl/--enable-nonfree); whisper.cpp is MIT. Sources and build script: the attached tarballs and \`build.sh\` at this tag."
             echo
